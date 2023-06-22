@@ -51,7 +51,7 @@ class SyncFiles:
         #TODO: implement exceptions for user input
         self.origin_path = r'{}'.format(args[0])
         self.log_str = args[1]
-        self.master = args[2]
+        self.source = args[2]
         self.index_str = "index.json"
         self.index = {}
         self.track_empty = True
@@ -80,7 +80,7 @@ class SyncFiles:
             # if origin index doesnt exist its because:
             # a) just started the syncing
             # b) someone deleted the index file on purpose
-            if (other is not None) and self.master:
+            if (other is not None) and self.source:
                 os.makedirs(os.path.dirname(os.path.join(other.origin_path, other.index_str)), exist_ok = True)
                 logger.info(f"UPDATED {other.index_str} FROM {self.origin_path} TO {other.origin_path}")
                 self.export(os.path.join(self.origin_path, self.index_str),
@@ -99,7 +99,7 @@ class SyncFiles:
             hashfile content, modified time
             (doesnt include index)
         """
-        #TODO: implement walking algorithm to also get modification time during transversal of tree folder
+        #TODO: implement walking algorithm to also get modification time during transversal of tree folder (also check deletion of empty folder is done in 1 sync)
         index = {}
         # os walk also gives folders
         origin_elem = os.walk(self.origin_path)
@@ -125,7 +125,7 @@ class SyncFiles:
     def manageEmptyFolder(self, other, dir_paths):
         """ Helper function to create/delete empty folders between 2 syncer objects
             used while going through os.walk to see if current folder is empty, if it is
-            check if caller is source folder(master) or replica (not master)
+            check if caller is source folder or replica
             TODO: A bit slow in deleting nested empty folders, set self.track_empty = False to not track
         """
         rel_path = os.path.relpath(dir_paths, self.origin_path)
@@ -134,7 +134,7 @@ class SyncFiles:
         #implement empty folder in replica if it doesnt exist
         if not(empty_folder_exists_in_other):
             # Goes into this condition if we are updating origin
-            if self.master:
+            if self.source:
                 logger.info(f"CREATED AN EMPTY FOLDER IN REPLICA: {abs_other_path_folder} FOUND IT IN: {dir_paths}")
                 os.makedirs(abs_other_path_folder)
             # Goes into this condition if we are updating replica
@@ -246,36 +246,37 @@ def signal_handler(sig, frame):
     
 
 def Orchestration(syncer_ori, syncer_repo, sync_from_index):
-        loop_time = time.time()
-        syncer_ori.initSyncFolders(sync_from_index, other = syncer_repo)
-        syncer_repo.initSyncFolders(sync_from_index, other = syncer_ori) 
-        
-        # Checking if tracked files were changed (both in origin and repo) and if hashes match
-        sync_needed_file_integrity = syncer_ori.index != syncer_repo.index
-        # sync_needed_hash_integrity = syncer_ori.hashFile(os.path.join(syncer_ori.origin_path, syncer_ori.index_str)) != \
-        #     syncer_repo.hashFile(os.path.join(syncer_repo.origin_path, syncer_repo.index_str))
-        
-        if sync_needed_file_integrity:
-            logger.debug('File diff found')
-            # compares two indexes of files and return their diff, equal and the files that have been updated
-            index_diff, index_equal, index_update = syncer_ori.compareIndexes(syncer_repo.index)
+    """ Takes two syncers (source and replica)"""
+    loop_time = time.time()
+    syncer_ori.initSyncFolders(sync_from_index, other = syncer_repo)
+    syncer_repo.initSyncFolders(sync_from_index, other = syncer_ori) 
+    
+    # Checking if tracked files were changed (both in origin and repo) and if hashes match
+    sync_needed_file_integrity = syncer_ori.index != syncer_repo.index
+    # sync_needed_hash_integrity = syncer_ori.hashFile(os.path.join(syncer_ori.origin_path, syncer_ori.index_str)) != \
+    #     syncer_repo.hashFile(os.path.join(syncer_repo.origin_path, syncer_repo.index_str))
+    
+    if sync_needed_file_integrity:
+        logger.debug('File diff found')
+        # compares two indexes of files and return their diff, equal and the files that have been updated
+        index_diff, index_equal, index_update = syncer_ori.compareIndexes(syncer_repo.index)
 
-            # no need to compare files which were already compared
-            if index_equal:
-                for key in index_equal:
-                    syncer_repo.index.pop(key, None)
-                        
-            # returns the file present in replica but not in source (these should be deleted)
-            index_diff_delete, __, __ = syncer_repo.compareIndexes(syncer_ori.index, opt_add_update = False)
-            # delete files not present in current workflow
-            syncer_repo.delete_unindexed_files(index_diff_delete)
-            # updates/add to repo and overwrite index in replica
-            syncer_ori.export_use_object(syncer_repo, opt_index = index_diff, operation = "CREATED")
-            syncer_ori.export_use_object(syncer_repo, opt_index = index_update, operation = "UPDATED")
-            # updates the index
-            syncer_ori.export(os.path.join(syncer_ori.origin_path, syncer_ori.index_str), \
-                    os.path.join(syncer_repo.origin_path, syncer_repo.index_str))
-        logger.info("Sync happened and took {} secs to check/apply changes".format(time.time()-loop_time))
+        # no need to compare files which were already compared
+        if index_equal:
+            for key in index_equal:
+                syncer_repo.index.pop(key, None)
+                    
+        # returns the file present in replica but not in source (these should be deleted)
+        index_diff_delete, __, __ = syncer_repo.compareIndexes(syncer_ori.index, opt_add_update = False)
+        # delete files not present in current workflow
+        syncer_repo.delete_unindexed_files(index_diff_delete)
+        # updates/add to repo and overwrite index in replica
+        syncer_ori.export_use_object(syncer_repo, opt_index = index_diff, operation = "CREATED")
+        syncer_ori.export_use_object(syncer_repo, opt_index = index_update, operation = "UPDATED")
+        # updates the index
+        syncer_ori.export(os.path.join(syncer_ori.origin_path, syncer_ori.index_str), \
+                os.path.join(syncer_repo.origin_path, syncer_repo.index_str))
+    logger.info("Sync happened and took {} secs to check/apply changes".format(time.time()-loop_time))
     
 
 if __name__ == "__main__":
@@ -320,7 +321,7 @@ if __name__ == "__main__":
         # (TODO: This can be used to check changes occured while script was not running (if )
     sync_from_index = True
     time_interval = int(sync_timer)
-    #TODO: Add a keypress condition to stop the loop and make it run one last check before closing
+    
     signal.signal(signal.SIGINT, signal_handler)
     while True:
         Orchestration(syncer_ori, syncer_repo, sync_from_index)
