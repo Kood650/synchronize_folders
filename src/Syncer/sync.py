@@ -127,6 +127,7 @@ class SyncFiles:
             used while going through os.walk to see if current folder is empty, if it is
             check if caller is source folder or replica
             TODO: A bit slow in deleting nested empty folders, set self.track_empty = False to not track
+            TODO: Deleting/creating directories of empty folders can take more than one cycle
         """
         rel_path = os.path.relpath(dir_paths, self.origin_path)
         abs_other_path_folder = os.path.join(other.origin_path, rel_path)
