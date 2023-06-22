@@ -28,8 +28,8 @@ If only interested in tracking files and not empty folders set the `class SyncFi
 
 ### Known Issues
 
-- [] Deleting/creating directories of empty folders can take more than one cycle. (Issue at `manageEmptyFolder` method)
+- [ ] Deleting/creating directories of empty folders can take more than one cycle. (Issue at `manageEmptyFolder` method)
 
 ### TODO
 
-- [] List of files to be ignored (already being done with index.json file) 
+- [ ] List of files to be ignored (already being done with index.json file) 
