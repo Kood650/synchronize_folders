@@ -19,17 +19,16 @@ If more info is needed run:
 python3 .\src\Syncer\sync.py -h
 ```
 
-To stop the synching interrupt the terminal (**__ SYNCHING IS PERFORMED BEFORE CLOSURE  __**).
+To stop the synching interrupt the terminal (**__ SYNCHING IS PERFORMED BEFORE EXITING  __**).
 
 ### Option
 
 If only interested in tracking files and not empty folders set the `class SyncFiles` instance variable `self.track_empty = True` to False.
         
-
 ### Known Issues
 
 - [ ] Deleting/creating directories of empty folders can take more than one cycle. (Issue at `manageEmptyFolder` method)
 
 ### TODO
 
-- [ ] List of files to be ignored (already being done with index.json file) 
+- [ ] List of files to be ignored (this already happens with index.json file) 
