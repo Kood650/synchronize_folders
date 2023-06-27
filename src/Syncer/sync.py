@@ -30,7 +30,7 @@ import signal
 
 Implementation:
 Made 2 syncer objects who map the directory every x secs and record an index of files present in directory:
-    If first time running the script create the index from scratch (if on orig the index will be copied to replica ) 
+    If first time running the script (no index in the path) create the index and copy it to replica ) 
         else load the available index file (applies to both)
     Update the indexes if loaded from file
         Does a walk in each directory and checks files to see if:
